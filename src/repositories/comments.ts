@@ -46,6 +46,10 @@ export function createCommentRepository(db: DB) {
         .all(taskId) as CommentRow[];
       return rows.map(toComment);
     },
+
+    deleteComment(commentId: string): boolean {
+      return db.prepare('DELETE FROM comments WHERE id = ?').run(commentId).changes > 0;
+    },
   };
 
   return repo;

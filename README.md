@@ -43,6 +43,7 @@ only needed when you want to apply them standalone.
 | `POST` | `/tasks` | Create a task |
 | `POST` | `/tasks/:id/comments` | Add a comment to a task |
 | `GET` | `/tasks/:id/comments` | List a task's comments, oldest-first |
+| `DELETE` | `/tasks/:id/comments/:commentId` | Delete a comment |
 | `PATCH` | `/tasks/:id` | Update a task |
 | `DELETE` | `/tasks/:id` | Delete a task |
 
@@ -81,6 +82,10 @@ immutable (no update/`updatedAt`).
 
 `GET /tasks/:id/comments` returns all of a task's comments oldest-first as a
 bare array (no pagination envelope), or `404` if the task doesn't exist.
+
+`DELETE /tasks/:id/comments/:commentId` hard-deletes a comment, returning `204`
+on success or `404` if the comment doesn't exist. Deleting a task cascades to
+its comments.
 
 ### Listing & pagination
 

@@ -98,3 +98,43 @@ describe('GET /tasks/:id/comments', () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe('DELETE /tasks/:id/comments/:commentId', () => {
+  async function addComment(taskId: string, body: Record<string, unknown>) {
+    return app.request(`/tasks/${taskId}/comments`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it('deletes a comment and removes it from the list', async () => {
+    const { id } = await (await createTask({ title: 'has comments' })).json();
+    const comment = await (await addComment(id, { body: 'delete me' })).json();
+
+    const res = await app.request(`/tasks/${id}/comments/${comment.id}`, { method: 'DELETE' });
+    expect(res.status).toBe(204);
+
+    const list = await (await app.request(`/tasks/${id}/comments`)).json();
+    expect(list).toEqual([]);
+  });
+
+  it('returns 404 for an unknown comment', async () => {
+    const { id } = await (await createTask({ title: 'x' })).json();
+    const res = await app.request(`/tasks/${id}/comments/does-not-exist`, { method: 'DELETE' });
+    expect(res.status).toBe(404);
+  });
+
+  it('cascades: deleting a task removes its comments', async () => {
+    const { id } = await (await createTask({ title: 'doomed' })).json();
+    await addComment(id, { body: 'orphan-to-be' });
+
+    expect((await app.request(`/tasks/${id}`, { method: 'DELETE' })).status).toBe(204);
+
+    // The task is gone, so the list endpoint 404s; assert no rows survive in the db.
+    const remaining = db.prepare('SELECT COUNT(*) AS n FROM comments WHERE task_id = ?').get(id) as {
+      n: number;
+    };
+    expect(remaining.n).toBe(0);
+  });
+});

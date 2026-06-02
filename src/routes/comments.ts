@@ -18,5 +18,12 @@ export function commentRoutes(comments: CommentRepository) {
     return c.json(comments.listComments(taskId));
   });
 
+  router.delete('/:id/comments/:commentId', (c) => {
+    if (!comments.deleteComment(c.req.param('commentId'))) {
+      return c.json({ error: 'Comment not found' }, 404);
+    }
+    return c.body(null, 204);
+  });
+
   return router;
 }
