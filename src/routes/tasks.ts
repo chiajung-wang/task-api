@@ -20,6 +20,10 @@ export function taskRoutes(tasks: TaskRepository) {
     return c.json({ data: items, ...(nextCursor ? { nextCursor } : {}) });
   });
 
+  router.get('/stats', (c) => {
+    return c.json(tasks.stats());
+  });
+
   router.get('/:id', (c) => {
     const task = tasks.get(c.req.param('id'));
     if (!task) return c.json({ error: 'Task not found' }, 404);

@@ -1,7 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import type { DB } from '../db/connection.js';
 import type { CursorPosition } from '../lib/cursor.js';
-import type { CreateTaskInput, Task, TaskStatus, UpdateTaskInput } from '../schemas/task.js';
+import {
+  taskStatuses,
+  type CreateTaskInput,
+  type Task,
+  type TaskStats,
+  type TaskStatus,
+  type UpdateTaskInput,
+} from '../schemas/task.js';
 
 interface ListTasksOptions {
   status?: TaskStatus;
@@ -64,6 +71,20 @@ export function createTaskRepository(db: DB) {
       const hasMore = rows.length > options.limit;
       const items = (hasMore ? rows.slice(0, options.limit) : rows).map(toTask);
       return { items, hasMore };
+    },
+
+    stats(): TaskStats {
+      // Seed every status at 0 so absent statuses still appear in the response.
+      const byStatus = Object.fromEntries(taskStatuses.map((s) => [s, 0])) as TaskStats['byStatus'];
+      const rows = db
+        .prepare('SELECT status, COUNT(*) AS count FROM tasks GROUP BY status')
+        .all() as { status: TaskStatus; count: number }[];
+      let total = 0;
+      for (const row of rows) {
+        byStatus[row.status] = row.count;
+        total += row.count;
+      }
+      return { total, byStatus };
     },
 
     get(id: string): Task | null {

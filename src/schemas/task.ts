@@ -14,6 +14,11 @@ export interface Task {
   updatedAt: string;
 }
 
+export interface TaskStats {
+  total: number;
+  byStatus: Record<TaskStatus, number>;
+}
+
 export const createTaskSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),

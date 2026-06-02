@@ -157,6 +157,31 @@ describe('GET /tasks pagination', () => {
   });
 });
 
+describe('GET /tasks/stats', () => {
+  it('returns zeroed counts when there are no tasks', async () => {
+    const res = await app.request('/tasks/stats');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      total: 0,
+      byStatus: { todo: 0, doing: 0, done: 0 },
+    });
+  });
+
+  it('counts tasks grouped by status', async () => {
+    await createTask({ title: 'a', status: 'todo' });
+    await createTask({ title: 'b', status: 'todo' });
+    await createTask({ title: 'c', status: 'doing' });
+    await createTask({ title: 'd', status: 'done' });
+
+    const res = await app.request('/tasks/stats');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      total: 4,
+      byStatus: { todo: 2, doing: 1, done: 1 },
+    });
+  });
+});
+
 describe('GET /tasks/:id', () => {
   it('returns a task', async () => {
     const { id } = await (await createTask({ title: 'find me' })).json();
