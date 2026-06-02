@@ -2,9 +2,12 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createTestApp } from './helpers.js';
 
 let app: ReturnType<typeof createTestApp>['app'];
+let db: ReturnType<typeof createTestApp>['db'];
 
 beforeEach(() => {
-  app = createTestApp().app;
+  const ctx = createTestApp();
+  app = ctx.app;
+  db = ctx.db;
 });
 
 async function createTask(body: Record<string, unknown>) {
@@ -13,6 +16,19 @@ async function createTask(body: Record<string, unknown>) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
+}
+
+/** Inserts a row directly so created_at (and same-ms collisions) are controllable. */
+function insertTask(row: { id: string; title: string; status?: string; createdAt: string }) {
+  db.prepare(
+    `INSERT INTO tasks (id, title, description, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(row.id, row.title, null, row.status ?? 'todo', row.createdAt, row.createdAt);
+}
+
+async function listPage(query: string) {
+  const res = await app.request(`/tasks?${query}`);
+  return { status: res.status, body: await res.json() };
 }
 
 describe('GET /health', () => {
@@ -54,11 +70,90 @@ describe('GET /tasks', () => {
     await createTask({ title: 'b', status: 'done' });
 
     const all = await (await app.request('/tasks')).json();
-    expect(all).toHaveLength(2);
+    expect(all.data).toHaveLength(2);
 
     const done = await (await app.request('/tasks?status=done')).json();
-    expect(done).toHaveLength(1);
-    expect(done[0].title).toBe('b');
+    expect(done.data).toHaveLength(1);
+    expect(done.data[0].title).toBe('b');
+  });
+});
+
+describe('GET /tasks pagination', () => {
+  it('caps results at ?limit and returns nextCursor when more exist', async () => {
+    insertTask({ id: 'a', title: 't1', createdAt: '2026-01-01T00:00:00.000Z' });
+    insertTask({ id: 'b', title: 't2', createdAt: '2026-01-01T00:00:01.000Z' });
+    insertTask({ id: 'c', title: 't3', createdAt: '2026-01-01T00:00:02.000Z' });
+
+    const { body } = await listPage('limit=2');
+    expect(body.data).toHaveLength(2);
+    expect(body.nextCursor).toBeTypeOf('string');
+    // Newest first: created_at DESC.
+    expect(body.data.map((t: { title: string }) => t.title)).toEqual(['t3', 't2']);
+  });
+
+  it('walks pages via nextCursor with no overlap or skips (same-ms tiebreaker)', async () => {
+    // All five share one millisecond, so the id tiebreaker alone orders them.
+    const ts = '2026-01-01T00:00:00.000Z';
+    for (const id of ['id-1', 'id-2', 'id-3', 'id-4', 'id-5']) {
+      insertTask({ id, title: id, createdAt: ts });
+    }
+
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    let pages = 0;
+    do {
+      const q = cursor ? `limit=2&cursor=${encodeURIComponent(cursor)}` : 'limit=2';
+      const { body } = await listPage(q);
+      seen.push(...body.data.map((t: { id: string }) => t.id));
+      cursor = body.nextCursor;
+      expect(++pages).toBeLessThan(10); // guard against an infinite loop
+    } while (cursor);
+
+    // id DESC tiebreaker, every row exactly once.
+    expect(seen).toEqual(['id-5', 'id-4', 'id-3', 'id-2', 'id-1']);
+    expect(new Set(seen).size).toBe(5);
+  });
+
+  it('omits nextCursor on the last page', async () => {
+    insertTask({ id: 'a', title: 't1', createdAt: '2026-01-01T00:00:00.000Z' });
+    insertTask({ id: 'b', title: 't2', createdAt: '2026-01-01T00:00:01.000Z' });
+
+    const { body } = await listPage('limit=2');
+    expect(body.data).toHaveLength(2);
+    expect(body.nextCursor).toBeUndefined();
+  });
+
+  it('keeps the ?status filter across paginated pages', async () => {
+    insertTask({ id: 'a', title: 'todo-1', status: 'todo', createdAt: '2026-01-01T00:00:00.000Z' });
+    insertTask({ id: 'b', title: 'done-1', status: 'done', createdAt: '2026-01-01T00:00:01.000Z' });
+    insertTask({ id: 'c', title: 'todo-2', status: 'todo', createdAt: '2026-01-01T00:00:02.000Z' });
+    insertTask({ id: 'd', title: 'todo-3', status: 'todo', createdAt: '2026-01-01T00:00:03.000Z' });
+
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    do {
+      const base = `status=todo&limit=2`;
+      const q = cursor ? `${base}&cursor=${encodeURIComponent(cursor)}` : base;
+      const { body } = await listPage(q);
+      for (const t of body.data) {
+        expect(t.status).toBe('todo');
+        seen.push(t.title);
+      }
+      cursor = body.nextCursor;
+    } while (cursor);
+
+    expect(seen.sort()).toEqual(['todo-1', 'todo-2', 'todo-3']);
+  });
+
+  it('rejects a malformed ?cursor with 400', async () => {
+    const res = await app.request('/tasks?cursor=not-a-valid-cursor');
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a zero or out-of-range ?limit with 400', async () => {
+    expect((await app.request('/tasks?limit=0')).status).toBe(400);
+    expect((await app.request('/tasks?limit=101')).status).toBe(400);
+    expect((await app.request('/tasks?limit=-1')).status).toBe(400);
   });
 });
 

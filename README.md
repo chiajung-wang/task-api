@@ -37,7 +37,7 @@ only needed when you want to apply them standalone.
 | Method | Path | Description |
 | --- | --- | --- |
 | `GET` | `/health` | Liveness check |
-| `GET` | `/tasks` | List tasks (`?status=todo\|doing\|done` to filter) |
+| `GET` | `/tasks` | List tasks — filter by `?status`, page with `?limit` & `?cursor` (see below) |
 | `GET` | `/tasks/:id` | Get one task |
 | `POST` | `/tasks` | Create a task |
 | `PATCH` | `/tasks/:id` | Update a task |
@@ -58,6 +58,40 @@ only needed when you want to apply them standalone.
 
 `id`, `createdAt`, and `updatedAt` are server-controlled. On create, only
 `title` is required; `status` defaults to `todo`.
+
+### Listing & pagination
+
+`GET /tasks` accepts these query params:
+
+| Param | Default | Description |
+| --- | --- | --- |
+| `status` | — | Filter by `todo \| doing \| done`. |
+| `limit` | `20` | Page size, `1`–`100`. Out-of-range or non-numeric → `400`. |
+| `cursor` | — | Opaque token from a previous response's `nextCursor`. Malformed → `400`. |
+
+Results are ordered newest-first (`createdAt` descending, `id` as tiebreaker)
+and returned in an envelope:
+
+```jsonc
+{
+  "data": [ /* Task[] */ ],
+  "nextCursor": "opaque-string"  // present only when more rows exist
+}
+```
+
+To page through results, pass the previous response's `nextCursor` back as
+`?cursor=...`. The cursor is **opaque** — treat it as a black box and send it
+back verbatim (don't parse or construct it). The last page omits `nextCursor`.
+
+A cursor encodes a position within a specific `status` filter; changing
+`status` invalidates any cursor obtained under the old filter.
+
+```bash
+# first page
+curl 'http://localhost:3000/tasks?status=todo&limit=20'
+# next page
+curl 'http://localhost:3000/tasks?status=todo&limit=20&cursor=<nextCursor>'
+```
 
 ## Project layout
 

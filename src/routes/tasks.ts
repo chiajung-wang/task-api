@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
+import { encodeCursor } from '../lib/cursor.js';
 import type { TaskRepository } from '../repositories/tasks.js';
 import { createTaskSchema, listTasksQuerySchema, updateTaskSchema } from '../schemas/task.js';
 
@@ -7,8 +8,16 @@ export function taskRoutes(tasks: TaskRepository) {
   const router = new Hono();
 
   router.get('/', zValidator('query', listTasksQuerySchema), (c) => {
-    const { status } = c.req.valid('query');
-    return c.json(tasks.list({ status }));
+    const { status, limit, cursor } = c.req.valid('query');
+    const { items, hasMore } = tasks.list({ status, limit, cursor });
+    const nextCursor =
+      hasMore && items.length > 0
+        ? encodeCursor({
+            createdAt: items[items.length - 1]!.createdAt,
+            id: items[items.length - 1]!.id,
+          })
+        : undefined;
+    return c.json({ data: items, ...(nextCursor ? { nextCursor } : {}) });
   });
 
   router.get('/:id', (c) => {
