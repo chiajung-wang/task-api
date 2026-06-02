@@ -38,6 +38,7 @@ only needed when you want to apply them standalone.
 | --- | --- | --- |
 | `GET` | `/health` | Liveness check |
 | `GET` | `/tasks` | List tasks — filter by `?status`, page with `?limit` & `?cursor` (see below) |
+| `GET` | `/tasks/stats` | Task counts grouped by status |
 | `GET` | `/tasks/:id` | Get one task |
 | `POST` | `/tasks` | Create a task |
 | `PATCH` | `/tasks/:id` | Update a task |
