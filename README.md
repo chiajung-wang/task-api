@@ -131,8 +131,11 @@ src/
     connection.ts     Opens better-sqlite3
     migrate.ts        Migration runner (+ `npm run migrate` CLI)
   routes/tasks.ts     HTTP handlers
+  routes/comments.ts  Comment HTTP handlers (mounted under /tasks)
   repositories/tasks.ts  SQL queries
+  repositories/comments.ts  Comment SQL queries
   schemas/task.ts     Zod schemas + types
+  schemas/comment.ts  Comment Zod schema + types
 migrations/           Numbered .sql files, applied in order
 tests/                Vitest suite
 ```

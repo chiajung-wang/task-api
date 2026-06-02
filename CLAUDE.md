@@ -42,8 +42,11 @@ src/
   db/connection.ts      Opens better-sqlite3 (WAL, foreign_keys ON); exports DB type
   db/migrate.ts         Migration runner + `npm run migrate` CLI
   routes/tasks.ts       HTTP handlers; Zod validation at the boundary
+  routes/comments.ts    Comment HTTP handlers, mounted under /tasks
   repositories/tasks.ts All SQL lives here; maps snake_case rows → camelCase Task
+  repositories/comments.ts Comment SQL; self-contained task-existence check
   schemas/task.ts       Zod schemas + inferred types (single source of truth)
+  schemas/comment.ts    Comment Zod schema + Comment/CreateCommentInput types
   lib/cursor.ts         Opaque base64url cursor encode/decode
 migrations/             Numbered NNNN_*.sql, applied in filename order
 tests/                  Vitest suite + in-memory app helper
@@ -93,6 +96,7 @@ each area — keep it current when you add docs or subsystems.
 | Add or change a migration / the `tasks` schema | `docs/migrations.md` — runner mechanics, naming, the add-a-column example |
 | Touch routes, the public API surface, or the task shape | `README.md` — routes, task shape, pagination/cursor usage |
 | Change filtering or pagination (keyset, cursors, indexes) | `PLAN.md` — design notes + keyset rationale |
+| Touch the comments subsystem (schema, repo, routes) | `README.md` — comment shape & endpoints; `docs/plans/comments.md` — phased design |
 
 ## Agent skills
 

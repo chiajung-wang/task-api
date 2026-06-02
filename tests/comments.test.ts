@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { createCommentRepository } from '../src/repositories/comments.js';
+import { createCommentSchema } from '../src/schemas/comment.js';
 import { createTestApp } from './helpers.js';
 
 let app: ReturnType<typeof createTestApp>['app'];
@@ -136,5 +138,69 @@ describe('DELETE /tasks/:id/comments/:commentId', () => {
       n: number;
     };
     expect(remaining.n).toBe(0);
+  });
+});
+
+describe('comment repository', () => {
+  let repo: ReturnType<typeof createCommentRepository>;
+
+  /** Inserts a task row directly so the repo can be exercised without the HTTP layer. */
+  function insertTask(id: string) {
+    db.prepare(
+      `INSERT INTO tasks (id, title, description, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(id, id, null, 'todo', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+  }
+
+  beforeEach(() => {
+    repo = createCommentRepository(db);
+  });
+
+  it('addComment returns null for an unknown task', () => {
+    expect(repo.addComment('does-not-exist', { body: 'orphan' })).toBeNull();
+  });
+
+  it('addComment persists and returns the mapped comment', () => {
+    insertTask('t1');
+    const comment = repo.addComment('t1', { body: 'hi', author: 'alice' });
+    expect(comment).toMatchObject({ taskId: 't1', body: 'hi', author: 'alice' });
+    expect(comment!.id).toBeTypeOf('string');
+  });
+
+  it('listComments returns comments oldest-first', () => {
+    insertTask('t1');
+    db.prepare(
+      `INSERT INTO comments (id, task_id, body, author, created_at) VALUES
+       ('b', 't1', 'second', NULL, '2026-01-01T00:00:01.000Z'),
+       ('a', 't1', 'first',  NULL, '2026-01-01T00:00:00.000Z'),
+       ('c', 't1', 'third',  NULL, '2026-01-01T00:00:02.000Z')`
+    ).run();
+    expect(repo.listComments('t1').map((c) => c.body)).toEqual(['first', 'second', 'third']);
+  });
+
+  it('deleteComment returns true when a row is removed, false otherwise', () => {
+    insertTask('t1');
+    const comment = repo.addComment('t1', { body: 'delete me' })!;
+    expect(repo.deleteComment(comment.id)).toBe(true);
+    expect(repo.deleteComment(comment.id)).toBe(false);
+  });
+});
+
+describe('createCommentSchema', () => {
+  it('accepts a body within 1–2000 chars', () => {
+    expect(createCommentSchema.safeParse({ body: 'a' }).success).toBe(true);
+    expect(createCommentSchema.safeParse({ body: 'a'.repeat(2000) }).success).toBe(true);
+  });
+
+  it('rejects an empty or over-length body', () => {
+    expect(createCommentSchema.safeParse({ body: '' }).success).toBe(false);
+    expect(createCommentSchema.safeParse({ body: 'a'.repeat(2001) }).success).toBe(false);
+  });
+
+  it('treats author as optional but bounds it to 1–100 chars', () => {
+    expect(createCommentSchema.safeParse({ body: 'x' }).success).toBe(true);
+    expect(createCommentSchema.safeParse({ body: 'x', author: 'a'.repeat(100) }).success).toBe(true);
+    expect(createCommentSchema.safeParse({ body: 'x', author: '' }).success).toBe(false);
+    expect(createCommentSchema.safeParse({ body: 'x', author: 'a'.repeat(101) }).success).toBe(false);
   });
 });
