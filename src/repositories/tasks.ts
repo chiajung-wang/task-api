@@ -3,6 +3,8 @@ import type { DB } from '../db/connection.js';
 import type { CursorPosition } from '../lib/cursor.js';
 import {
   taskStatuses,
+  type Comment,
+  type CreateCommentInput,
   type CreateTaskInput,
   type Task,
   type TaskStats,
@@ -30,6 +32,14 @@ interface TaskRow {
   updated_at: string;
 }
 
+interface CommentRow {
+  id: string;
+  task_id: string;
+  body: string;
+  author: string | null;
+  created_at: string;
+}
+
 function toTask(row: TaskRow): Task {
   return {
     id: row.id,
@@ -38,6 +48,16 @@ function toTask(row: TaskRow): Task {
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function toComment(row: CommentRow): Comment {
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    body: row.body,
+    author: row.author,
+    createdAt: row.created_at,
   };
 }
 
@@ -119,6 +139,20 @@ export function createTaskRepository(db: DB) {
 
     delete(id: string): boolean {
       return db.prepare('DELETE FROM tasks WHERE id = ?').run(id).changes > 0;
+    },
+
+    addComment(taskId: string, input: CreateCommentInput): Comment | null {
+      if (!repo.get(taskId)) return null;
+      const now = new Date().toISOString();
+      const id = randomUUID();
+      db.prepare(
+        `INSERT INTO comments (id, task_id, body, author, created_at)
+         VALUES (?, ?, ?, ?, ?)`
+      ).run(id, taskId, input.body, input.author ?? null, now);
+      const row = db
+        .prepare('SELECT * FROM comments WHERE id = ?')
+        .get(id) as CommentRow;
+      return toComment(row);
     },
   };
 

@@ -19,6 +19,19 @@ export interface TaskStats {
   byStatus: Record<TaskStatus, number>;
 }
 
+export interface Comment {
+  id: string;
+  taskId: string;
+  body: string;
+  author: string | null;
+  createdAt: string;
+}
+
+export const createCommentSchema = z.object({
+  body: z.string().min(1).max(2000),
+  author: z.string().min(1).max(100).optional(),
+});
+
 export const createTaskSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
@@ -53,6 +66,7 @@ export const listTasksQuerySchema = z.object({
     }),
 });
 
+export type CreateCommentInput = z.infer<typeof createCommentSchema>;
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;

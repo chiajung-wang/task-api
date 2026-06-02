@@ -41,6 +41,7 @@ only needed when you want to apply them standalone.
 | `GET` | `/tasks/stats` | Task counts grouped by status |
 | `GET` | `/tasks/:id` | Get one task |
 | `POST` | `/tasks` | Create a task |
+| `POST` | `/tasks/:id/comments` | Add a comment to a task |
 | `PATCH` | `/tasks/:id` | Update a task |
 | `DELETE` | `/tasks/:id` | Delete a task |
 
@@ -59,6 +60,23 @@ only needed when you want to apply them standalone.
 
 `id`, `createdAt`, and `updatedAt` are server-controlled. On create, only
 `title` is required; `status` defaults to `todo`.
+
+### Comment shape
+
+```jsonc
+{
+  "id": "uuid",
+  "taskId": "uuid",
+  "body": "string",
+  "author": "string | null",
+  "createdAt": "ISO-8601 string"
+}
+```
+
+`POST /tasks/:id/comments` takes `{ "body": string }` with an optional
+`author`; `id`, `taskId`, and `createdAt` are server-controlled. It returns the
+created comment with `201`, or `404` if the task doesn't exist. Comments are
+immutable (no update/`updatedAt`).
 
 ### Listing & pagination
 
