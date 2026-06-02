@@ -6,6 +6,16 @@ status filtering and cursor-based pagination on `GET /tasks`. Built on Hono +
 ORM), validated with Zod. Tests run on Vitest against in-memory SQLite. There is
 no auth, no frontend, and no remote infrastructure — it's a single-process API.
 
+## Before you start work
+
+Before executing a task that touches a subsystem, first identify whether a
+reference doc governs that area and **read it before acting** — not only when
+you get stuck. Check the "Reference docs — read before you work" map below, plus
+any `README`/doc file near the code you're about to change. Treat the matching
+doc as required pre-reading: a task looking trivial is not a reason to skip it.
+This is a general rule — apply it to areas not yet listed here too, and add new
+entries to the map as the codebase grows.
+
 ## Commands
 
 | Command | What it does |
@@ -72,8 +82,14 @@ tests/                  Vitest suite + in-memory app helper
 - Don't bypass Zod validation or put business rules in routes that belong in the
   schema or repository.
 
-## Deeper docs
+## Reference docs — read before you work
 
-- `README.md` — public API reference: routes, task shape, pagination/cursor usage.
-- `docs/migrations.md` — how the migration runner works and how to add one.
-- `PLAN.md` — design notes for the filtering/pagination feature (keyset rationale).
+Per "Before you start work" above: if your task falls in one of these areas,
+read the matching doc *first*. This map is the source of truth for what governs
+each area — keep it current when you add docs or subsystems.
+
+| If you're about to… | Read first |
+| --- | --- |
+| Add or change a migration / the `tasks` schema | `docs/migrations.md` — runner mechanics, naming, the add-a-column example |
+| Touch routes, the public API surface, or the task shape | `README.md` — routes, task shape, pagination/cursor usage |
+| Change filtering or pagination (keyset, cursors, indexes) | `PLAN.md` — design notes + keyset rationale |
