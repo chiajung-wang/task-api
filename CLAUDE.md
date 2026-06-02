@@ -93,3 +93,17 @@ each area — keep it current when you add docs or subsystems.
 | Add or change a migration / the `tasks` schema | `docs/migrations.md` — runner mechanics, naming, the add-a-column example |
 | Touch routes, the public API surface, or the task shape | `README.md` — routes, task shape, pagination/cursor usage |
 | Change filtering or pagination (keyset, cursors, indexes) | `PLAN.md` — design notes + keyset rationale |
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs live as local markdown under `.scratch/<feature-slug>/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Canonical triage vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout (`CONTEXT.md` + `docs/adr/` at root). See `docs/agents/domain.md`.
