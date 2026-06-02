@@ -12,5 +12,11 @@ export function commentRoutes(comments: CommentRepository) {
     return c.json(comment, 201);
   });
 
+  router.get('/:id/comments', (c) => {
+    const taskId = c.req.param('id');
+    if (!comments.taskExists(taskId)) return c.json({ error: 'Task not found' }, 404);
+    return c.json(comments.listComments(taskId));
+  });
+
   return router;
 }

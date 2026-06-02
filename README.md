@@ -42,6 +42,7 @@ only needed when you want to apply them standalone.
 | `GET` | `/tasks/:id` | Get one task |
 | `POST` | `/tasks` | Create a task |
 | `POST` | `/tasks/:id/comments` | Add a comment to a task |
+| `GET` | `/tasks/:id/comments` | List a task's comments, oldest-first |
 | `PATCH` | `/tasks/:id` | Update a task |
 | `DELETE` | `/tasks/:id` | Delete a task |
 
@@ -77,6 +78,9 @@ only needed when you want to apply them standalone.
 `author`; `id`, `taskId`, and `createdAt` are server-controlled. It returns the
 created comment with `201`, or `404` if the task doesn't exist. Comments are
 immutable (no update/`updatedAt`).
+
+`GET /tasks/:id/comments` returns all of a task's comments oldest-first as a
+bare array (no pagination envelope), or `404` if the task doesn't exist.
 
 ### Listing & pagination
 

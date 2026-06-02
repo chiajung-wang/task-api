@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createTestApp } from './helpers.js';
 
 let app: ReturnType<typeof createTestApp>['app'];
+let db: ReturnType<typeof createTestApp>['db'];
 
 beforeEach(() => {
   const ctx = createTestApp();
   app = ctx.app;
+  db = ctx.db;
 });
 
 async function createTask(body: Record<string, unknown>) {
@@ -55,5 +57,44 @@ describe('POST /tasks/:id/comments', () => {
     const { id } = await (await createTask({ title: 'x' })).json();
     expect((await addComment(id, {})).status).toBe(400);
     expect((await addComment(id, { body: '' })).status).toBe(400);
+  });
+});
+
+describe('GET /tasks/:id/comments', () => {
+  /** Inserts a comment row directly so created_at is controllable. */
+  function insertComment(row: { id: string; taskId: string; body: string; createdAt: string }) {
+    db.prepare(
+      `INSERT INTO comments (id, task_id, body, author, created_at)
+       VALUES (?, ?, ?, ?, ?)`
+    ).run(row.id, row.taskId, row.body, null, row.createdAt);
+  }
+
+  it('lists comments oldest-first', async () => {
+    const { id } = await (await createTask({ title: 'has comments' })).json();
+    // Inserted out of chronological order to prove the query sorts, not insertion order.
+    insertComment({ id: 'c2', taskId: id, body: 'second', createdAt: '2026-01-01T00:00:01.000Z' });
+    insertComment({ id: 'c3', taskId: id, body: 'third', createdAt: '2026-01-01T00:00:02.000Z' });
+    insertComment({ id: 'c1', taskId: id, body: 'first', createdAt: '2026-01-01T00:00:00.000Z' });
+
+    const res = await app.request(`/tasks/${id}/comments`);
+    expect(res.status).toBe(200);
+    const comments = await res.json();
+    expect(comments.map((c: { body: string }) => c.body)).toEqual([
+      'first',
+      'second',
+      'third',
+    ]);
+  });
+
+  it('returns an empty array for a task with no comments', async () => {
+    const { id } = await (await createTask({ title: 'quiet' })).json();
+    const res = await app.request(`/tasks/${id}/comments`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([]);
+  });
+
+  it('returns 404 for an unknown task', async () => {
+    const res = await app.request('/tasks/does-not-exist/comments');
+    expect(res.status).toBe(404);
   });
 });

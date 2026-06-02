@@ -22,9 +22,12 @@ function toComment(row: CommentRow): Comment {
 
 export function createCommentRepository(db: DB) {
   const repo = {
+    taskExists(taskId: string): boolean {
+      return db.prepare('SELECT 1 FROM tasks WHERE id = ?').get(taskId) !== undefined;
+    },
+
     addComment(taskId: string, input: CreateCommentInput): Comment | null {
-      const task = db.prepare('SELECT 1 FROM tasks WHERE id = ?').get(taskId);
-      if (!task) return null;
+      if (!repo.taskExists(taskId)) return null;
       const now = new Date().toISOString();
       const id = randomUUID();
       db.prepare(
@@ -35,6 +38,13 @@ export function createCommentRepository(db: DB) {
         .prepare('SELECT * FROM comments WHERE id = ?')
         .get(id) as CommentRow;
       return toComment(row);
+    },
+
+    listComments(taskId: string): Comment[] {
+      const rows = db
+        .prepare('SELECT * FROM comments WHERE task_id = ? ORDER BY created_at ASC, id ASC')
+        .all(taskId) as CommentRow[];
+      return rows.map(toComment);
     },
   };
 
