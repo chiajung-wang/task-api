@@ -23,7 +23,7 @@ export function runMigrations(db: DB, dir: string = MIGRATIONS_DIR): string[] {
   `);
 
   const applied = new Set(
-    (db.prepare('SELECT name FROM _migrations').all() as MigrationRow[]).map((r) => r.name)
+    (db.prepare('SELECT name FROM _migrations').all() as MigrationRow[]).map((r) => r.name),
   );
 
   const files = readdirSync(dir)
@@ -56,7 +56,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log('No pending migrations.');
   } else {
     console.log(`Applied ${applied.length} migration(s):`);
-    applied.forEach((f) => console.log(`  - ${f}`));
+    for (const f of applied) {
+      console.log(`  - ${f}`);
+    }
   }
   db.close();
 }

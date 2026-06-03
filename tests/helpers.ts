@@ -1,6 +1,6 @@
+import { createApp } from '../src/app.js';
 import { createDb } from '../src/db/connection.js';
 import { runMigrations } from '../src/db/migrate.js';
-import { createApp } from '../src/app.js';
 
 /** Builds an app backed by a fresh in-memory SQLite database. */
 export function createTestApp() {

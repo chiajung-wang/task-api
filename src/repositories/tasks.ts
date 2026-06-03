@@ -2,11 +2,11 @@ import { randomUUID } from 'node:crypto';
 import type { DB } from '../db/connection.js';
 import type { CursorPosition } from '../lib/cursor.js';
 import {
-  taskStatuses,
   type CreateTaskInput,
   type Task,
   type TaskStats,
   type TaskStatus,
+  taskStatuses,
   type UpdateTaskInput,
 } from '../schemas/task.js';
 
@@ -65,9 +65,7 @@ export function createTaskRepository(db: DB) {
 
       // Fetch one extra row to detect a next page without a separate COUNT.
       const rows = db
-        .prepare(
-          `SELECT * FROM tasks ${where} ORDER BY created_at DESC, id DESC LIMIT ?`
-        )
+        .prepare(`SELECT * FROM tasks ${where} ORDER BY created_at DESC, id DESC LIMIT ?`)
         .all(...params, options.limit + 1) as TaskRow[];
 
       const hasMore = rows.length > options.limit;
@@ -99,7 +97,7 @@ export function createTaskRepository(db: DB) {
       const id = randomUUID();
       db.prepare(
         `INSERT INTO tasks (id, title, description, status, due_date, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         id,
         input.title,
@@ -107,7 +105,7 @@ export function createTaskRepository(db: DB) {
         input.status ?? 'todo',
         input.dueDate ?? null,
         now,
-        now
+        now,
       );
       return repo.get(id)!;
     },
@@ -123,7 +121,7 @@ export function createTaskRepository(db: DB) {
         updatedAt: new Date().toISOString(),
       };
       db.prepare(
-        'UPDATE tasks SET title = ?, description = ?, status = ?, due_date = ?, updated_at = ? WHERE id = ?'
+        'UPDATE tasks SET title = ?, description = ?, status = ?, due_date = ?, updated_at = ? WHERE id = ?',
       ).run(next.title, next.description, next.status, next.dueDate, next.updatedAt, id);
       return repo.get(id);
     },

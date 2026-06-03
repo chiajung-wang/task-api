@@ -67,7 +67,7 @@ describe('GET /tasks/:id/comments', () => {
   function insertComment(row: { id: string; taskId: string; body: string; createdAt: string }) {
     db.prepare(
       `INSERT INTO comments (id, task_id, body, author, created_at)
-       VALUES (?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?)`,
     ).run(row.id, row.taskId, row.body, null, row.createdAt);
   }
 
@@ -81,11 +81,7 @@ describe('GET /tasks/:id/comments', () => {
     const res = await app.request(`/tasks/${id}/comments`);
     expect(res.status).toBe(200);
     const comments = await res.json();
-    expect(comments.map((c: { body: string }) => c.body)).toEqual([
-      'first',
-      'second',
-      'third',
-    ]);
+    expect(comments.map((c: { body: string }) => c.body)).toEqual(['first', 'second', 'third']);
   });
 
   it('returns an empty array for a task with no comments', async () => {
@@ -134,7 +130,9 @@ describe('DELETE /tasks/:id/comments/:commentId', () => {
     expect((await app.request(`/tasks/${id}`, { method: 'DELETE' })).status).toBe(204);
 
     // The task is gone, so the list endpoint 404s; assert no rows survive in the db.
-    const remaining = db.prepare('SELECT COUNT(*) AS n FROM comments WHERE task_id = ?').get(id) as {
+    const remaining = db
+      .prepare('SELECT COUNT(*) AS n FROM comments WHERE task_id = ?')
+      .get(id) as {
       n: number;
     };
     expect(remaining.n).toBe(0);
@@ -148,7 +146,7 @@ describe('comment repository', () => {
   function insertTask(id: string) {
     db.prepare(
       `INSERT INTO tasks (id, title, description, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?)`,
     ).run(id, id, null, 'todo', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
   }
 
@@ -173,7 +171,7 @@ describe('comment repository', () => {
       `INSERT INTO comments (id, task_id, body, author, created_at) VALUES
        ('b', 't1', 'second', NULL, '2026-01-01T00:00:01.000Z'),
        ('a', 't1', 'first',  NULL, '2026-01-01T00:00:00.000Z'),
-       ('c', 't1', 'third',  NULL, '2026-01-01T00:00:02.000Z')`
+       ('c', 't1', 'third',  NULL, '2026-01-01T00:00:02.000Z')`,
     ).run();
     expect(repo.listComments('t1').map((c) => c.body)).toEqual(['first', 'second', 'third']);
   });
@@ -199,8 +197,12 @@ describe('createCommentSchema', () => {
 
   it('treats author as optional but bounds it to 1–100 chars', () => {
     expect(createCommentSchema.safeParse({ body: 'x' }).success).toBe(true);
-    expect(createCommentSchema.safeParse({ body: 'x', author: 'a'.repeat(100) }).success).toBe(true);
+    expect(createCommentSchema.safeParse({ body: 'x', author: 'a'.repeat(100) }).success).toBe(
+      true,
+    );
     expect(createCommentSchema.safeParse({ body: 'x', author: '' }).success).toBe(false);
-    expect(createCommentSchema.safeParse({ body: 'x', author: 'a'.repeat(101) }).success).toBe(false);
+    expect(createCommentSchema.safeParse({ body: 'x', author: 'a'.repeat(101) }).success).toBe(
+      false,
+    );
   });
 });

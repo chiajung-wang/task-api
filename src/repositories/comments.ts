@@ -32,11 +32,9 @@ export function createCommentRepository(db: DB) {
       const id = randomUUID();
       db.prepare(
         `INSERT INTO comments (id, task_id, body, author, created_at)
-         VALUES (?, ?, ?, ?, ?)`
+         VALUES (?, ?, ?, ?, ?)`,
       ).run(id, taskId, input.body, input.author ?? null, now);
-      const row = db
-        .prepare('SELECT * FROM comments WHERE id = ?')
-        .get(id) as CommentRow;
+      const row = db.prepare('SELECT * FROM comments WHERE id = ?').get(id) as CommentRow;
       return toComment(row);
     },
 

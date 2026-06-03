@@ -1,9 +1,9 @@
-import { serve } from '@hono/node-server';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { serve } from '@hono/node-server';
+import { createApp } from './app.js';
 import { createDb } from './db/connection.js';
 import { runMigrations } from './db/migrate.js';
-import { createApp } from './app.js';
 
 const dbPath = process.env.DATABASE_PATH ?? 'data/tasks.db';
 mkdirSync(dirname(dbPath), { recursive: true });

@@ -22,7 +22,7 @@ async function createTask(body: Record<string, unknown>) {
 function insertTask(row: { id: string; title: string; status?: string; createdAt: string }) {
   db.prepare(
     `INSERT INTO tasks (id, title, description, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?)`,
   ).run(row.id, row.title, null, row.status ?? 'todo', row.createdAt, row.createdAt);
 }
 

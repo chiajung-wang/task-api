@@ -1,5 +1,5 @@
-import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
+import { Hono } from 'hono';
 import type { CommentRepository } from '../repositories/comments.js';
 import { createCommentSchema } from '../schemas/comment.js';
 

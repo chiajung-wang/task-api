@@ -1,12 +1,8 @@
-import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
+import { Hono } from 'hono';
 import { encodeCursor } from '../lib/cursor.js';
 import type { TaskRepository } from '../repositories/tasks.js';
-import {
-  createTaskSchema,
-  listTasksQuerySchema,
-  updateTaskSchema,
-} from '../schemas/task.js';
+import { createTaskSchema, listTasksQuerySchema, updateTaskSchema } from '../schemas/task.js';
 
 export function taskRoutes(tasks: TaskRepository) {
   const router = new Hono();
