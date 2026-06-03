@@ -31,6 +31,13 @@ only needed when you want to apply them standalone.
 | `npm run migrate` | Apply pending SQL migrations |
 | `npm test` | Run the test suite |
 | `npm run test:watch` | Run tests in watch mode |
+| `npm run lint` | Biome check (lint + format report) |
+| `npm run format` | Biome auto-fix (lint + format) |
+| `npm run typecheck` | Type-check `src/` with `tsc --noEmit` |
+
+A husky pre-commit hook runs `biome check --write` (on staged files via
+lint-staged), `npm run typecheck`, and the full test suite, and **blocks the
+commit** if any check fails.
 
 ## Routes
 

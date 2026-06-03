@@ -25,9 +25,18 @@ entries to the map as the codebase grows.
 | `npm run migrate` | Apply pending SQL migrations standalone |
 | `npm test` | Run the Vitest suite once |
 | `npm run test:watch` | Vitest in watch mode |
+| `npm run lint` | Biome check (lint + format report, no writes) |
+| `npm run format` | Biome check with `--write` (auto-fix lint + format) |
+| `npm run typecheck` | `tsc --noEmit` over `src/` (via `tsconfig.build.json`) |
 
-There is no lint/format step and no build for local dev (`tsx` runs TS directly).
-Type-check via `npx tsc --noEmit` if you need it.
+There is no build for local dev (`tsx` runs TS directly). Formatting and linting
+are handled by **Biome** (`biome.json`).
+
+A **husky** pre-commit hook (`.husky/pre-commit`) enforces three gates and aborts
+the commit if any fails: `lint-staged` (runs `biome check --write` on staged
+files), then `npm run typecheck`, then the full `npm test` suite. The typecheck
+gate is scoped to `src/` (tests are validated at runtime by Vitest), so
+`npm run typecheck` uses `tsconfig.build.json`, not the root `tsconfig.json`.
 
 Env vars: `DATABASE_PATH` (default `data/tasks.db`), `PORT` (default `3000`).
 
