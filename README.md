@@ -44,7 +44,7 @@ commit** if any check fails.
 | Method | Path | Description |
 | --- | --- | --- |
 | `GET` | `/health` | Liveness check |
-| `GET` | `/tasks` | List tasks — filter by `?status`, page with `?limit` & `?cursor` (see below) |
+| `GET` | `/tasks` | List tasks — filter by `?status`, search by `?q`, page with `?limit` & `?cursor` (see below) |
 | `GET` | `/tasks/stats` | Task counts grouped by status |
 | `GET` | `/tasks/:id` | Get one task |
 | `POST` | `/tasks` | Create a task |
@@ -104,6 +104,7 @@ its comments.
 | Param | Default | Description |
 | --- | --- | --- |
 | `status` | — | Filter by `todo \| doing \| done`. |
+| `q` | — | Case-insensitive substring match on `title` (1–200 chars). No matches → empty `data`. Combinable with `status`. |
 | `limit` | `20` | Page size, `1`–`100`. Out-of-range or non-numeric → `400`. |
 | `cursor` | — | Opaque token from a previous response's `nextCursor`. Malformed → `400`. |
 

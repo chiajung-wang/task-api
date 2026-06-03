@@ -12,8 +12,14 @@ import {
 
 interface ListTasksOptions {
   status?: TaskStatus;
+  q?: string;
   limit: number;
   cursor?: CursorPosition;
+}
+
+// Escape LIKE wildcards so user input matches literally (`\` is the ESCAPE char).
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, '\\$&');
 }
 
 interface ListTasksResult {
@@ -52,6 +58,12 @@ export function createTaskRepository(db: DB) {
       if (options.status) {
         conditions.push('status = ?');
         params.push(options.status);
+      }
+
+      // Case-insensitive substring match on title (SQLite LIKE is ASCII case-insensitive).
+      if (options.q) {
+        conditions.push("title LIKE ? ESCAPE '\\'");
+        params.push(`%${escapeLike(options.q)}%`);
       }
 
       // Keyset predicate: row-value comparison against the cursor position.

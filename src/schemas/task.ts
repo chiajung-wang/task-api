@@ -41,6 +41,7 @@ export const updateTaskSchema = z
 
 export const listTasksQuerySchema = z.object({
   status: taskStatusSchema.optional(),
+  q: z.string().min(1).max(200).optional(),
   limit: z.coerce.number().int().positive().max(100).default(20),
   cursor: z
     .string()

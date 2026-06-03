@@ -120,6 +120,54 @@ describe('GET /tasks', () => {
   });
 });
 
+describe('GET /tasks?q (title search)', () => {
+  it('returns only tasks whose title contains the substring', async () => {
+    await createTask({ title: 'Buy milk' });
+    await createTask({ title: 'Buy eggs' });
+    await createTask({ title: 'Walk the dog' });
+
+    const { body } = await listPage('q=buy');
+    expect(body.data.map((t: { title: string }) => t.title).sort()).toEqual([
+      'Buy eggs',
+      'Buy milk',
+    ]);
+  });
+
+  it('matches case-insensitively', async () => {
+    await createTask({ title: 'Refactor Cursor Logic' });
+
+    const { body } = await listPage('q=CURSOR');
+    expect(body.data.map((t: { title: string }) => t.title)).toEqual(['Refactor Cursor Logic']);
+  });
+
+  it('returns an empty array (not an error) when nothing matches', async () => {
+    await createTask({ title: 'Buy milk' });
+
+    const { status, body } = await listPage('q=xyzzy');
+    expect(status).toBe(200);
+    expect(body.data).toEqual([]);
+  });
+
+  it('combines the title search with the status filter', async () => {
+    await createTask({ title: 'Deploy api', status: 'todo' });
+    await createTask({ title: 'Deploy api', status: 'done' });
+    await createTask({ title: 'Write docs', status: 'todo' });
+
+    const { body } = await listPage('q=deploy&status=todo');
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0].title).toBe('Deploy api');
+    expect(body.data[0].status).toBe('todo');
+  });
+
+  it('treats LIKE wildcards in the query as literal characters', async () => {
+    await createTask({ title: '50% off sale' });
+    await createTask({ title: '50 cents' });
+
+    const { body } = await listPage(`q=${encodeURIComponent('50%')}`);
+    expect(body.data.map((t: { title: string }) => t.title)).toEqual(['50% off sale']);
+  });
+});
+
 describe('GET /tasks pagination', () => {
   it('caps results at ?limit and returns nextCursor when more exist', async () => {
     insertTask({ id: 'a', title: 't1', createdAt: '2026-01-01T00:00:00.000Z' });
