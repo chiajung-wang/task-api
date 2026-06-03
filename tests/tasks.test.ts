@@ -64,6 +64,48 @@ describe('POST /tasks', () => {
   });
 });
 
+describe('task dueDate', () => {
+  const due = '2026-12-31T23:59:59.000Z';
+
+  it('defaults dueDate to null when omitted', async () => {
+    const task = await (await createTask({ title: 'no due date' })).json();
+    expect(task.dueDate).toBeNull();
+  });
+
+  it('stores a dueDate provided on create', async () => {
+    const res = await createTask({ title: 'with due date', dueDate: due });
+    expect(res.status).toBe(201);
+    expect((await res.json()).dueDate).toBe(due);
+  });
+
+  it('rejects a non-ISO-8601 dueDate with 400', async () => {
+    expect((await createTask({ title: 'x', dueDate: 'next tuesday' })).status).toBe(400);
+    expect((await createTask({ title: 'x', dueDate: '2026-13-01' })).status).toBe(400);
+  });
+
+  it('sets dueDate via PATCH', async () => {
+    const { id } = await (await createTask({ title: 'patch me' })).json();
+    const res = await app.request(`/tasks/${id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ dueDate: due }),
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).dueDate).toBe(due);
+  });
+
+  it('clears dueDate when PATCHed to null', async () => {
+    const { id } = await (await createTask({ title: 'clear me', dueDate: due })).json();
+    const res = await app.request(`/tasks/${id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ dueDate: null }),
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).dueDate).toBeNull();
+  });
+});
+
 describe('GET /tasks', () => {
   it('lists tasks and filters by status', async () => {
     await createTask({ title: 'a', status: 'todo' });

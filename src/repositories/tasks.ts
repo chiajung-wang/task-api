@@ -26,6 +26,7 @@ interface TaskRow {
   title: string;
   description: string | null;
   status: TaskStatus;
+  due_date: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -36,6 +37,7 @@ function toTask(row: TaskRow): Task {
     title: row.title,
     description: row.description,
     status: row.status,
+    dueDate: row.due_date,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -96,9 +98,17 @@ export function createTaskRepository(db: DB) {
       const now = new Date().toISOString();
       const id = randomUUID();
       db.prepare(
-        `INSERT INTO tasks (id, title, description, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)`
-      ).run(id, input.title, input.description ?? null, input.status ?? 'todo', now, now);
+        `INSERT INTO tasks (id, title, description, status, due_date, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        id,
+        input.title,
+        input.description ?? null,
+        input.status ?? 'todo',
+        input.dueDate ?? null,
+        now,
+        now
+      );
       return repo.get(id)!;
     },
 
@@ -109,11 +119,12 @@ export function createTaskRepository(db: DB) {
         title: input.title ?? existing.title,
         description: input.description !== undefined ? input.description : existing.description,
         status: input.status ?? existing.status,
+        dueDate: input.dueDate !== undefined ? input.dueDate : existing.dueDate,
         updatedAt: new Date().toISOString(),
       };
       db.prepare(
-        'UPDATE tasks SET title = ?, description = ?, status = ?, updated_at = ? WHERE id = ?'
-      ).run(next.title, next.description, next.status, next.updatedAt, id);
+        'UPDATE tasks SET title = ?, description = ?, status = ?, due_date = ?, updated_at = ? WHERE id = ?'
+      ).run(next.title, next.description, next.status, next.dueDate, next.updatedAt, id);
       return repo.get(id);
     },
 

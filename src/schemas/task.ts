@@ -10,6 +10,7 @@ export interface Task {
   title: string;
   description: string | null;
   status: TaskStatus;
+  dueDate: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -23,6 +24,7 @@ export const createTaskSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
   status: taskStatusSchema.optional(),
+  dueDate: z.string().datetime({ offset: true }).nullable().optional(),
 });
 
 export const updateTaskSchema = z
@@ -30,6 +32,7 @@ export const updateTaskSchema = z
     title: z.string().min(1).max(200),
     description: z.string().max(2000).nullable(),
     status: taskStatusSchema,
+    dueDate: z.string().datetime({ offset: true }).nullable(),
   })
   .partial()
   .refine((data) => Object.keys(data).length > 0, {

@@ -55,13 +55,16 @@ only needed when you want to apply them standalone.
   "title": "string",
   "description": "string | null",
   "status": "todo | doing | done",
+  "dueDate": "ISO-8601 string | null",
   "createdAt": "ISO-8601 string",
   "updatedAt": "ISO-8601 string"
 }
 ```
 
 `id`, `createdAt`, and `updatedAt` are server-controlled. On create, only
-`title` is required; `status` defaults to `todo`.
+`title` is required; `status` defaults to `todo`. `dueDate` is optional and
+nullable — omit it (or send `null`) for no due date; PATCH it to `null` to
+clear an existing one. It must be a valid ISO-8601 timestamp.
 
 ### Comment shape
 
