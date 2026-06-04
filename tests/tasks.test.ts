@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { isLegalTransition } from '../src/schemas/task.js';
+import { createTaskRepository } from '../src/repositories/tasks.js';
+import { type CreateTaskInput, isLegalTransition } from '../src/schemas/task.js';
 import { createTestApp } from './helpers.js';
 
 let app: ReturnType<typeof createTestApp>['app'];
@@ -62,6 +63,78 @@ describe('POST /tasks', () => {
   it('rejects an invalid status with 400', async () => {
     const res = await createTask({ title: 'x', status: 'archived' });
     expect(res.status).toBe(400);
+  });
+});
+
+describe('POST /tasks/bulk', () => {
+  async function bulkCreate(body: unknown) {
+    return app.request('/tasks/bulk', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it('creates many tasks in one call, preserving order', async () => {
+    const res = await bulkCreate([
+      { title: 'first' },
+      { title: 'second', status: 'doing' },
+      { title: 'third', description: 'with desc' },
+    ]);
+    expect(res.status).toBe(201);
+    const { data } = await res.json();
+    expect(data).toHaveLength(3);
+    expect(data.map((t: { title: string }) => t.title)).toEqual(['first', 'second', 'third']);
+    // Server controls id/timestamps for every row.
+    for (const task of data) {
+      expect(task.id).toBeTypeOf('string');
+      expect(task.createdAt).toBe(task.updatedAt);
+    }
+    expect(data[1].status).toBe('doing');
+    expect(data[0].status).toBe('todo');
+  });
+
+  it('persists every created task', async () => {
+    await bulkCreate([{ title: 'a' }, { title: 'b' }]);
+    const { body } = await listPage('limit=10');
+    expect(body.data).toHaveLength(2);
+  });
+
+  it('rejects an empty array with 400', async () => {
+    expect((await bulkCreate([])).status).toBe(400);
+  });
+
+  it('rejects a batch over 100 with 400', async () => {
+    const tooMany = Array.from({ length: 101 }, (_, i) => ({ title: `t${i}` }));
+    expect((await bulkCreate(tooMany)).status).toBe(400);
+  });
+
+  it('rejects the whole batch (400) if any task is invalid, persisting nothing', async () => {
+    const res = await bulkCreate([{ title: 'ok' }, { title: '' }]);
+    expect(res.status).toBe(400);
+    const { body } = await listPage('limit=10');
+    expect(body.data).toHaveLength(0);
+  });
+});
+
+describe('task repository bulk create', () => {
+  it('rolls back the entire batch when a row fails at the db layer', () => {
+    const repo = createTaskRepository(db);
+    // Second row violates the status CHECK constraint, bypassing Zod to hit the db.
+    const inputs = [
+      { title: 'good' },
+      { title: 'bad', status: 'nope' as unknown },
+    ] as CreateTaskInput[];
+
+    expect(() => repo.createMany(inputs)).toThrow();
+    const { n } = db.prepare('SELECT COUNT(*) AS n FROM tasks').get() as { n: number };
+    expect(n).toBe(0);
+  });
+
+  it('returns created tasks in input order', () => {
+    const repo = createTaskRepository(db);
+    const created = repo.createMany([{ title: 'one' }, { title: 'two' }]);
+    expect(created.map((t) => t.title)).toEqual(['one', 'two']);
   });
 });
 
