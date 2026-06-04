@@ -3,12 +3,19 @@ import type { DB } from '../db/connection.js';
 import type { CursorPosition } from '../lib/cursor.js';
 import {
   type CreateTaskInput,
+  isLegalTransition,
   type Task,
   type TaskStats,
   type TaskStatus,
   taskStatuses,
   type UpdateTaskInput,
 } from '../schemas/task.js';
+
+// Outcome of a status transition: success, missing task, or an illegal move.
+export type TransitionResult =
+  | { ok: true; task: Task }
+  | { ok: false; reason: 'not_found' }
+  | { ok: false; reason: 'illegal'; from: TaskStatus; to: TaskStatus };
 
 interface ListTasksOptions {
   status?: TaskStatus;
@@ -148,6 +155,17 @@ export function createTaskRepository(db: DB) {
         'UPDATE tasks SET title = ?, description = ?, status = ?, due_date = ?, updated_at = ? WHERE id = ?',
       ).run(next.title, next.description, next.status, next.dueDate, next.updatedAt, id);
       return repo.get(id);
+    },
+
+    transitionStatus(id: string, to: TaskStatus): TransitionResult {
+      const existing = repo.get(id);
+      if (!existing) return { ok: false, reason: 'not_found' };
+      if (!isLegalTransition(existing.status, to)) {
+        return { ok: false, reason: 'illegal', from: existing.status, to };
+      }
+      // Same status is a no-op: leave the row (and updatedAt) untouched.
+      if (existing.status === to) return { ok: true, task: existing };
+      return { ok: true, task: repo.update(id, { status: to })! };
     },
 
     delete(id: string): boolean {

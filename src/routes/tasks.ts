@@ -6,6 +6,7 @@ import {
   bulkCreateTasksSchema,
   createTaskSchema,
   listTasksQuerySchema,
+  statusTransitionSchema,
   updateTaskSchema,
 } from '../schemas/task.js';
 
@@ -49,6 +50,15 @@ export function taskRoutes(tasks: TaskRepository) {
     const task = tasks.update(c.req.param('id'), c.req.valid('json'));
     if (!task) return c.json({ error: 'Task not found' }, 404);
     return c.json(task);
+  });
+
+  router.patch('/:id/status', zValidator('json', statusTransitionSchema), (c) => {
+    const result = tasks.transitionStatus(c.req.param('id'), c.req.valid('json').status);
+    if (!result.ok) {
+      if (result.reason === 'not_found') return c.json({ error: 'Task not found' }, 404);
+      return c.json({ error: `Illegal status transition: ${result.from} → ${result.to}` }, 422);
+    }
+    return c.json(result.task);
   });
 
   router.delete('/:id', (c) => {
