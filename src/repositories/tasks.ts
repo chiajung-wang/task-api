@@ -122,6 +122,18 @@ export function createTaskRepository(db: DB) {
       return repo.get(id)!;
     },
 
+    createMany(inputs: CreateTaskInput[]): Task[] {
+      // One transaction for the whole batch: any failing row rolls back all of them.
+      const insertAll = db.transaction((items: CreateTaskInput[]): Task[] => {
+        const created: Task[] = [];
+        for (const input of items) {
+          created.push(repo.create(input));
+        }
+        return created;
+      });
+      return insertAll(inputs);
+    },
+
     update(id: string, input: UpdateTaskInput): Task | null {
       const existing = repo.get(id);
       if (!existing) return null;
