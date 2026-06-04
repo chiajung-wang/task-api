@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createCommentRepository } from '../src/repositories/comments.js';
-import { createCommentSchema } from '../src/schemas/comment.js';
+import { createCommentSchema, updateCommentSchema } from '../src/schemas/comment.js';
 import { createTestApp } from './helpers.js';
 
 let app: ReturnType<typeof createTestApp>['app'];
@@ -139,6 +139,83 @@ describe('DELETE /tasks/:id/comments/:commentId', () => {
   });
 });
 
+describe('PATCH /tasks/:id/comments/:commentId', () => {
+  async function addComment(taskId: string, body: Record<string, unknown>) {
+    return app.request(`/tasks/${taskId}/comments`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  async function editComment(taskId: string, commentId: string, body: Record<string, unknown>) {
+    return app.request(`/tasks/${taskId}/comments/${commentId}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it('edits body and author and returns the updated comment', async () => {
+    const { id } = await (await createTask({ title: 'has comments' })).json();
+    const created = await (await addComment(id, { body: 'before', author: 'alice' })).json();
+
+    const res = await editComment(id, created.id, { body: 'after', author: 'bob' });
+    expect(res.status).toBe(200);
+    const updated = await res.json();
+    expect(updated).toMatchObject({ id: created.id, taskId: id, body: 'after', author: 'bob' });
+  });
+
+  it('supports a partial edit, leaving omitted fields unchanged', async () => {
+    const { id } = await (await createTask({ title: 'x' })).json();
+    const created = await (await addComment(id, { body: 'keep author', author: 'alice' })).json();
+
+    const updated = await (await editComment(id, created.id, { body: 'new body' })).json();
+    expect(updated.body).toBe('new body');
+    expect(updated.author).toBe('alice');
+  });
+
+  it('bumps updatedAt past createdAt on edit', async () => {
+    const { id } = await (await createTask({ title: 'x' })).json();
+    const created = await (await addComment(id, { body: 'first' })).json();
+    expect(created.updatedAt).toBe(created.createdAt);
+
+    const updated = await (await editComment(id, created.id, { body: 'second' })).json();
+    expect(updated.createdAt).toBe(created.createdAt);
+    expect(updated.updatedAt >= created.updatedAt).toBe(true);
+  });
+
+  it('returns 404 for an unknown task', async () => {
+    const res = await editComment('does-not-exist', 'whatever', { body: 'x' });
+    expect(res.status).toBe(404);
+    expect((await res.json()).error).toBe('Task not found');
+  });
+
+  it('returns 404 for an unknown comment on a real task', async () => {
+    const { id } = await (await createTask({ title: 'x' })).json();
+    const res = await editComment(id, 'does-not-exist', { body: 'x' });
+    expect(res.status).toBe(404);
+    expect((await res.json()).error).toBe('Comment not found');
+  });
+
+  it('returns 404 when the comment belongs to a different task', async () => {
+    const { id: taskA } = await (await createTask({ title: 'A' })).json();
+    const { id: taskB } = await (await createTask({ title: 'B' })).json();
+    const onA = await (await addComment(taskA, { body: 'on A' })).json();
+
+    const res = await editComment(taskB, onA.id, { body: 'hijack' });
+    expect(res.status).toBe(404);
+    expect((await res.json()).error).toBe('Comment not found');
+  });
+
+  it('rejects invalid input with 400', async () => {
+    const { id } = await (await createTask({ title: 'x' })).json();
+    const created = await (await addComment(id, { body: 'ok' })).json();
+    expect((await editComment(id, created.id, { body: '' })).status).toBe(400);
+    expect((await editComment(id, created.id, { author: '' })).status).toBe(400);
+  });
+});
+
 describe('comment repository', () => {
   let repo: ReturnType<typeof createCommentRepository>;
 
@@ -182,6 +259,31 @@ describe('comment repository', () => {
     expect(repo.deleteComment(comment.id)).toBe(true);
     expect(repo.deleteComment(comment.id)).toBe(false);
   });
+
+  it('addComment sets updatedAt equal to createdAt', () => {
+    insertTask('t1');
+    const comment = repo.addComment('t1', { body: 'hi' })!;
+    expect(comment.updatedAt).toBe(comment.createdAt);
+  });
+
+  it('updateComment returns null for an unknown comment', () => {
+    insertTask('t1');
+    expect(repo.updateComment('t1', 'does-not-exist', { body: 'x' })).toBeNull();
+  });
+
+  it('updateComment returns null when the comment belongs to a different task', () => {
+    insertTask('t1');
+    insertTask('t2');
+    const comment = repo.addComment('t1', { body: 'on t1' })!;
+    expect(repo.updateComment('t2', comment.id, { body: 'x' })).toBeNull();
+  });
+
+  it('updateComment applies a partial edit and keeps omitted fields', () => {
+    insertTask('t1');
+    const comment = repo.addComment('t1', { body: 'before', author: 'alice' })!;
+    const updated = repo.updateComment('t1', comment.id, { body: 'after' })!;
+    expect(updated).toMatchObject({ id: comment.id, body: 'after', author: 'alice' });
+  });
 });
 
 describe('createCommentSchema', () => {
@@ -204,5 +306,24 @@ describe('createCommentSchema', () => {
     expect(createCommentSchema.safeParse({ body: 'x', author: 'a'.repeat(101) }).success).toBe(
       false,
     );
+  });
+});
+
+describe('updateCommentSchema', () => {
+  it('accepts an empty object (no-op edit)', () => {
+    expect(updateCommentSchema.safeParse({}).success).toBe(true);
+  });
+
+  it('accepts partial updates of body and/or author', () => {
+    expect(updateCommentSchema.safeParse({ body: 'x' }).success).toBe(true);
+    expect(updateCommentSchema.safeParse({ author: 'alice' }).success).toBe(true);
+    expect(updateCommentSchema.safeParse({ body: 'x', author: 'alice' }).success).toBe(true);
+  });
+
+  it('rejects empty or over-length values', () => {
+    expect(updateCommentSchema.safeParse({ body: '' }).success).toBe(false);
+    expect(updateCommentSchema.safeParse({ body: 'a'.repeat(2001) }).success).toBe(false);
+    expect(updateCommentSchema.safeParse({ author: '' }).success).toBe(false);
+    expect(updateCommentSchema.safeParse({ author: 'a'.repeat(101) }).success).toBe(false);
   });
 });
