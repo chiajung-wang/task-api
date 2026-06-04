@@ -2,7 +2,12 @@ import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { encodeCursor } from '../lib/cursor.js';
 import type { TaskRepository } from '../repositories/tasks.js';
-import { createTaskSchema, listTasksQuerySchema, updateTaskSchema } from '../schemas/task.js';
+import {
+  bulkCreateTasksSchema,
+  createTaskSchema,
+  listTasksQuerySchema,
+  updateTaskSchema,
+} from '../schemas/task.js';
 
 export function taskRoutes(tasks: TaskRepository) {
   const router = new Hono();
@@ -33,6 +38,11 @@ export function taskRoutes(tasks: TaskRepository) {
   router.post('/', zValidator('json', createTaskSchema), (c) => {
     const task = tasks.create(c.req.valid('json'));
     return c.json(task, 201);
+  });
+
+  router.post('/bulk', zValidator('json', bulkCreateTasksSchema), (c) => {
+    const created = tasks.createMany(c.req.valid('json'));
+    return c.json({ data: created }, 201);
   });
 
   router.patch('/:id', zValidator('json', updateTaskSchema), (c) => {

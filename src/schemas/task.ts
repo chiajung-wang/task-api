@@ -27,6 +27,9 @@ export const createTaskSchema = z.object({
   dueDate: z.string().datetime({ offset: true }).nullable().optional(),
 });
 
+// Bulk create: a non-empty array of task inputs, capped to keep one request bounded.
+export const bulkCreateTasksSchema = z.array(createTaskSchema).min(1).max(100);
+
 export const updateTaskSchema = z
   .object({
     title: z.string().min(1).max(200),
@@ -58,5 +61,6 @@ export const listTasksQuerySchema = z.object({
 });
 
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
+export type BulkCreateTasksInput = z.infer<typeof bulkCreateTasksSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;
