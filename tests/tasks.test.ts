@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { isLegalTransition } from '../src/schemas/task.js';
 import { createTestApp } from './helpers.js';
 
 let app: ReturnType<typeof createTestApp>['app'];
@@ -321,6 +322,88 @@ describe('PATCH /tasks/:id', () => {
       body: JSON.stringify({ status: 'done' }),
     });
     expect(res.status).toBe(404);
+  });
+});
+
+describe('PATCH /tasks/:id/status', () => {
+  async function patchStatus(id: string, status: unknown) {
+    return app.request(`/tasks/${id}/status`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  it('applies a legal transition todo → doing and bumps updatedAt', async () => {
+    const created = await (await createTask({ title: 'move me' })).json();
+    expect(created.status).toBe('todo');
+
+    const res = await patchStatus(created.id, 'doing');
+    expect(res.status).toBe(200);
+    const updated = await res.json();
+    expect(updated.status).toBe('doing');
+    expect(updated.updatedAt >= created.updatedAt).toBe(true);
+  });
+
+  it('allows doing → done, doing → todo, and done → doing (reopen)', async () => {
+    const doing = await (await createTask({ title: 'a', status: 'doing' })).json();
+    expect((await patchStatus(doing.id, 'done')).status).toBe(200);
+
+    const doing2 = await (await createTask({ title: 'b', status: 'doing' })).json();
+    expect((await patchStatus(doing2.id, 'todo')).status).toBe(200);
+
+    const done = await (await createTask({ title: 'c', status: 'done' })).json();
+    const reopened = await patchStatus(done.id, 'doing');
+    expect(reopened.status).toBe(200);
+    expect((await reopened.json()).status).toBe('doing');
+  });
+
+  it('rejects an illegal transition todo → done with 422', async () => {
+    const created = await (await createTask({ title: 'skip' })).json();
+    const res = await patchStatus(created.id, 'done');
+    expect(res.status).toBe(422);
+    expect((await res.json()).error).toMatch(/illegal status transition/i);
+    // Task is unchanged.
+    const after = await (await app.request(`/tasks/${created.id}`)).json();
+    expect(after.status).toBe('todo');
+  });
+
+  it('treats a same-status request as an idempotent no-op (200, updatedAt unchanged)', async () => {
+    const created = await (await createTask({ title: 'noop' })).json();
+    const res = await patchStatus(created.id, 'todo');
+    expect(res.status).toBe(200);
+    const after = await res.json();
+    expect(after.status).toBe('todo');
+    expect(after.updatedAt).toBe(created.updatedAt);
+  });
+
+  it('returns 404 for an unknown task', async () => {
+    const res = await patchStatus('does-not-exist', 'doing');
+    expect(res.status).toBe(404);
+  });
+
+  it('rejects an invalid status value with 400', async () => {
+    const created = await (await createTask({ title: 'x' })).json();
+    expect((await patchStatus(created.id, 'archived')).status).toBe(400);
+  });
+});
+
+describe('isLegalTransition', () => {
+  it('allows forward moves and reopen', () => {
+    expect(isLegalTransition('todo', 'doing')).toBe(true);
+    expect(isLegalTransition('doing', 'done')).toBe(true);
+    expect(isLegalTransition('doing', 'todo')).toBe(true);
+    expect(isLegalTransition('done', 'doing')).toBe(true);
+  });
+
+  it('allows same-status (idempotent)', () => {
+    expect(isLegalTransition('todo', 'todo')).toBe(true);
+    expect(isLegalTransition('done', 'done')).toBe(true);
+  });
+
+  it('rejects skips', () => {
+    expect(isLegalTransition('todo', 'done')).toBe(false);
+    expect(isLegalTransition('done', 'todo')).toBe(false);
   });
 });
 

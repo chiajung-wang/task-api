@@ -5,6 +5,21 @@ export const taskStatuses = ['todo', 'doing', 'done'] as const;
 export const taskStatusSchema = z.enum(taskStatuses);
 export type TaskStatus = z.infer<typeof taskStatusSchema>;
 
+// Legal status transitions (forward + reopen). Same-status is always allowed as
+// an idempotent no-op; any move not listed here is rejected.
+const statusTransitions: Record<TaskStatus, readonly TaskStatus[]> = {
+  todo: ['doing'],
+  doing: ['done', 'todo'],
+  done: ['doing'],
+};
+
+export function isLegalTransition(from: TaskStatus, to: TaskStatus): boolean {
+  return from === to || statusTransitions[from].includes(to);
+}
+
+export const statusTransitionSchema = z.object({ status: taskStatusSchema });
+export type StatusTransitionInput = z.infer<typeof statusTransitionSchema>;
+
 export interface Task {
   id: string;
   title: string;
