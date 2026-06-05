@@ -60,6 +60,13 @@ export const updateTaskSchema = z
 export const listTasksQuerySchema = z.object({
   status: taskStatusSchema.optional(),
   q: z.string().min(1).max(200).optional(),
+  dueBefore: z.string().datetime({ offset: true }).optional(),
+  dueAfter: z.string().datetime({ offset: true }).optional(),
+  // Accept only the literal strings "true"/"false" so typos like ?overdue=yes 400 at the boundary.
+  overdue: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => v === 'true'),
   limit: z.coerce.number().int().positive().max(100).default(20),
   cursor: z
     .string()

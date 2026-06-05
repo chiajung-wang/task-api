@@ -321,6 +321,138 @@ describe('GET /tasks pagination', () => {
   });
 });
 
+describe('GET /tasks due-date filters', () => {
+  /** Direct insert so we can control dueDate (including null) and createdAt. */
+  function insertWithDue(row: {
+    id: string;
+    title: string;
+    status?: string;
+    dueDate: string | null;
+    createdAt?: string;
+  }) {
+    const ts = row.createdAt ?? '2026-01-01T00:00:00.000Z';
+    db.prepare(
+      `INSERT INTO tasks (id, title, description, status, due_date, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(row.id, row.title, null, row.status ?? 'todo', row.dueDate, ts, ts);
+  }
+
+  it('?dueBefore returns only tasks with dueDate strictly before the cutoff', async () => {
+    insertWithDue({ id: 'a', title: 'early', dueDate: '2026-06-01T00:00:00.000Z' });
+    insertWithDue({ id: 'b', title: 'cutoff', dueDate: '2026-07-01T00:00:00.000Z' });
+    insertWithDue({ id: 'c', title: 'late', dueDate: '2026-08-01T00:00:00.000Z' });
+
+    const { body } = await listPage('dueBefore=2026-07-01T00:00:00.000Z');
+    expect(body.data.map((t: { title: string }) => t.title).sort()).toEqual(['early']);
+  });
+
+  it('?dueAfter returns only tasks with dueDate strictly after the cutoff', async () => {
+    insertWithDue({ id: 'a', title: 'early', dueDate: '2026-06-01T00:00:00.000Z' });
+    insertWithDue({ id: 'b', title: 'cutoff', dueDate: '2026-07-01T00:00:00.000Z' });
+    insertWithDue({ id: 'c', title: 'late', dueDate: '2026-08-01T00:00:00.000Z' });
+
+    const { body } = await listPage('dueAfter=2026-07-01T00:00:00.000Z');
+    expect(body.data.map((t: { title: string }) => t.title).sort()).toEqual(['late']);
+  });
+
+  it('combines dueBefore and dueAfter into a half-open window', async () => {
+    insertWithDue({ id: 'a', title: 'early', dueDate: '2026-05-01T00:00:00.000Z' });
+    insertWithDue({ id: 'b', title: 'mid', dueDate: '2026-06-15T00:00:00.000Z' });
+    insertWithDue({ id: 'c', title: 'late', dueDate: '2026-08-01T00:00:00.000Z' });
+
+    const { body } = await listPage(
+      'dueAfter=2026-06-01T00:00:00.000Z&dueBefore=2026-07-01T00:00:00.000Z',
+    );
+    expect(body.data.map((t: { title: string }) => t.title)).toEqual(['mid']);
+  });
+
+  it('excludes null-dueDate tasks from dueBefore, dueAfter, and overdue', async () => {
+    insertWithDue({ id: 'a', title: 'no-due', dueDate: null });
+    insertWithDue({ id: 'b', title: 'past', dueDate: '2026-01-01T00:00:00.000Z' });
+
+    const before = await listPage('dueBefore=2030-01-01T00:00:00.000Z');
+    expect(before.body.data.map((t: { title: string }) => t.title)).toEqual(['past']);
+
+    const after = await listPage('dueAfter=2025-01-01T00:00:00.000Z');
+    expect(after.body.data.map((t: { title: string }) => t.title)).toEqual(['past']);
+
+    const overdue = await listPage('overdue=true');
+    expect(overdue.body.data.map((t: { title: string }) => t.title)).toEqual(['past']);
+  });
+
+  it('?overdue=true returns only past-due, non-done tasks', async () => {
+    const past = '2020-01-01T00:00:00.000Z';
+    const future = '2099-01-01T00:00:00.000Z';
+    insertWithDue({ id: 'a', title: 'past-todo', status: 'todo', dueDate: past });
+    insertWithDue({ id: 'b', title: 'past-doing', status: 'doing', dueDate: past });
+    insertWithDue({ id: 'c', title: 'past-done', status: 'done', dueDate: past });
+    insertWithDue({ id: 'd', title: 'future-todo', status: 'todo', dueDate: future });
+
+    const { body } = await listPage('overdue=true');
+    expect(body.data.map((t: { title: string }) => t.title).sort()).toEqual([
+      'past-doing',
+      'past-todo',
+    ]);
+  });
+
+  it('combines overdue with ?status', async () => {
+    const past = '2020-01-01T00:00:00.000Z';
+    insertWithDue({ id: 'a', title: 'past-todo', status: 'todo', dueDate: past });
+    insertWithDue({ id: 'b', title: 'past-doing', status: 'doing', dueDate: past });
+
+    const { body } = await listPage('overdue=true&status=doing');
+    expect(body.data.map((t: { title: string }) => t.title)).toEqual(['past-doing']);
+  });
+
+  it('combines due-date filters with ?q', async () => {
+    const past = '2020-01-01T00:00:00.000Z';
+    insertWithDue({ id: 'a', title: 'Buy milk', status: 'todo', dueDate: past });
+    insertWithDue({ id: 'b', title: 'Walk the dog', status: 'todo', dueDate: past });
+
+    const { body } = await listPage('overdue=true&q=buy');
+    expect(body.data.map((t: { title: string }) => t.title)).toEqual(['Buy milk']);
+  });
+
+  it('paginates across a due-date filtered set', async () => {
+    const past = '2020-01-01T00:00:00.000Z';
+    for (let i = 1; i <= 3; i++) {
+      insertWithDue({
+        id: `id-${i}`,
+        title: `t${i}`,
+        status: 'todo',
+        dueDate: past,
+        createdAt: `2026-01-01T00:00:0${i}.000Z`,
+      });
+    }
+    // A non-matching task should stay excluded across both pages.
+    insertWithDue({ id: 'future', title: 'future', dueDate: '2099-01-01T00:00:00.000Z' });
+
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    let pages = 0;
+    do {
+      const base = 'overdue=true&limit=2';
+      const q = cursor ? `${base}&cursor=${encodeURIComponent(cursor)}` : base;
+      const { body } = await listPage(q);
+      seen.push(...body.data.map((t: { title: string }) => t.title));
+      cursor = body.nextCursor;
+      expect(++pages).toBeLessThan(10);
+    } while (cursor);
+
+    expect(seen.sort()).toEqual(['t1', 't2', 't3']);
+  });
+
+  it('rejects an invalid datetime in dueBefore/dueAfter with 400', async () => {
+    expect((await listPage('dueBefore=not-a-date')).status).toBe(400);
+    expect((await listPage('dueAfter=2026-13-01')).status).toBe(400);
+  });
+
+  it('rejects a non-boolean overdue with 400', async () => {
+    expect((await listPage('overdue=yes')).status).toBe(400);
+    expect((await listPage('overdue=1')).status).toBe(400);
+  });
+});
+
 describe('GET /tasks/stats', () => {
   it('returns zeroed counts when there are no tasks', async () => {
     const res = await app.request('/tasks/stats');
