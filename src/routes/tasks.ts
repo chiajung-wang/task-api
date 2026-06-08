@@ -14,8 +14,7 @@ export function taskRoutes(tasks: TaskRepository) {
   const router = new Hono();
 
   router.get('/', zValidator('query', listTasksQuerySchema), (c) => {
-    const { status, q, limit, cursor } = c.req.valid('query');
-    const { items, hasMore } = tasks.list({ status, q, limit, cursor });
+    const { items, hasMore } = tasks.list(c.req.valid('query'));
     const nextCursor =
       hasMore && items.length > 0
         ? encodeCursor({

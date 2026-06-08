@@ -105,8 +105,14 @@ its comments.
 | --- | --- | --- |
 | `status` | — | Filter by `todo \| doing \| done`. |
 | `q` | — | Case-insensitive substring match on `title` (1–200 chars). No matches → empty `data`. Combinable with `status`. |
+| `dueBefore` | — | ISO-8601 datetime (with offset). Only tasks with `dueDate < dueBefore`. Tasks with no `dueDate` are excluded. |
+| `dueAfter` | — | ISO-8601 datetime (with offset). Only tasks with `dueDate > dueAfter`. Tasks with no `dueDate` are excluded. |
+| `overdue` | — | `true` or `false`. When `true`, only tasks with `dueDate < now()` and `status != 'done'`. Tasks with no `dueDate` are excluded. |
 | `limit` | `20` | Page size, `1`–`100`. Out-of-range or non-numeric → `400`. |
 | `cursor` | — | Opaque token from a previous response's `nextCursor`. Malformed → `400`. |
+
+`dueBefore`, `dueAfter`, and `overdue` all compose with `status`, `q`, and each
+other; an invalid datetime or a non-boolean `overdue` returns `400`.
 
 Results are ordered newest-first (`createdAt` descending, `id` as tiebreaker)
 and returned in an envelope:

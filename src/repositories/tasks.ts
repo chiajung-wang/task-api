@@ -20,6 +20,9 @@ export type TransitionResult =
 interface ListTasksOptions {
   status?: TaskStatus;
   q?: string;
+  dueBefore?: string;
+  dueAfter?: string;
+  overdue?: boolean;
   limit: number;
   cursor?: CursorPosition;
 }
@@ -71,6 +74,21 @@ export function createTaskRepository(db: DB) {
       if (options.q) {
         conditions.push("title LIKE ? ESCAPE '\\'");
         params.push(`%${escapeLike(options.q)}%`);
+      }
+
+      // Due-date predicates exclude null due_date rows: NULL comparisons in SQLite
+      // yield NULL, which WHERE treats as false — so `due_date < ?` already drops them.
+      if (options.dueBefore) {
+        conditions.push('due_date < ?');
+        params.push(options.dueBefore);
+      }
+      if (options.dueAfter) {
+        conditions.push('due_date > ?');
+        params.push(options.dueAfter);
+      }
+      if (options.overdue) {
+        conditions.push("due_date < ? AND status != 'done'");
+        params.push(new Date().toISOString());
       }
 
       // Keyset predicate: row-value comparison against the cursor position.
